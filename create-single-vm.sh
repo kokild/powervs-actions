@@ -76,7 +76,14 @@ function create_server () {
     local SSH_USER=$8
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S): Creating VMName:$SERVER_NAME"
-    ibmcloud pi instance-create "$SERVER_NAME" --image "$SERVER_IMAGE" --memory "$SERVER_MEMORY" --network "$PUBLIC_NETWORK" --processors "$SERVER_PROCESSOR" --processor-type shared --key-name "$SSH_KEY_NAME" --sys-type "$SERVER_SYS_TYPE" --json >> $SERVER_ROOT/server.log | tee
+    ibmcloud pi instance-create "$SERVER_NAME" --image "$SERVER_IMAGE" --memory "$SERVER_MEMORY" \
+        --network "$PUBLIC_NETWORK" --processors "$SERVER_PROCESSOR" --processor-type shared \
+        --key-name "$SSH_KEY_NAME" --sys-type "$SERVER_SYS_TYPE" --json > $SERVER_ROOT/server.log 
+    if head -1 $SERVER_ROOT/server.log | grep -q -w FAILED
+    then
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Server create FAILED"
+        return 1
+    fi
 
     SERVER_ID=$(jq -r ".[].pvmInstanceID" < $SERVER_ROOT/server.log)
     SERVER_NAME=$(jq -r ".[].serverName" < $SERVER_ROOT/server.log)
