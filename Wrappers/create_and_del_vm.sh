@@ -115,23 +115,23 @@ function main
     eval "$cmd"
 
     #wait for given time
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" 
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" | tee -a $logfile
     sleep $keep_time_sec
 
     # get VM id from logfile
     vm_id=$(grep "was created with the ID:" $logfile | grep $server_name | awk '{print $NF}')
     if [[ -z $vm_id ]]
     then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): VM ID for VM $server_name could not be found"
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VM ID for VM $server_name could not be found" | tee -a $logfile
     else
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): Deleting VM $server_name (ID: $vm_id)"
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): Deleting VM $server_name (ID: $vm_id)" | tee -a $logfile
         ibmcloud pi instance-delete $vm_id
     fi
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): === TASK END ===" | tee -a $logfile
     if [[ $use_tmp_logfile -eq 1 ]]
     then
         rm -f $logfile
     fi
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): === TASK END ==="
 }
 
 main "$@"
