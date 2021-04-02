@@ -8,6 +8,8 @@ progname=$(basename $0)
 progpath=$(dirname $0)
 keep_time_sec_def=600 #10 mins, default time to keep VM before deleting
 server_name=
+server_name_pref_def=vm
+server_name_pref=$server_name_pref_def
 server_image=
 public_network=
 ssh_key_name=
@@ -24,7 +26,7 @@ use_tmp_logfile=0
 
 function usage
 {
-    echo "Usage: $progname [--server_name=<name>] --server_image=<image_id> --public_network=<pubnet_id> --ssh_key_name=<key_name>"
+    echo "Usage: $progname [--server_name_pref=<name>] --server_image=<image_id> --public_network=<pubnet_id> --ssh_key_name=<key_name>"
     echo "        --server_memory=<memory_GB> --server_processor=<cpu> --server_sys_type=<sys_type> --ssh_user=<user>"
     echo "        --api_key=<key> --pvs_crn=<crn> [--keep_time_sec=<time before delete, default:$keep_time_sec_def>] [--logfile=<file>]"
 }
@@ -33,9 +35,9 @@ function main
 {
     while [[ $1 =~ ^-- ]]
     do
-        if [[ $1 =~ ^--server_name= ]]
+        if [[ $1 =~ ^--server_name_pref= ]]
         then
-            server_name=$(cut -d= -f2- <<< $1)
+            server_name_pref=$(cut -d= -f2- <<< $1)
         elif [[ $1 =~ ^--server_image= ]]
         then
             server_image=$(cut -d= -f2- <<< $1)
@@ -93,10 +95,7 @@ function main
         return 1
     fi
 
-    if [[ -z $server_name ]]
-    then
-        server_name=vm-$(openssl rand -hex 5)
-    fi
+    server_name=${server_name_pref}-$(openssl rand -hex 5)
 
     if [[ -z $logfile ]]
     then

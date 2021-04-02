@@ -76,16 +76,16 @@ function create_server () {
     local SSH_USER=$8
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S): Creating VMName:$SERVER_NAME"
-    ibmcloud pi instance-create "$SERVER_NAME" --image "$SERVER_IMAGE" --memory "$SERVER_MEMORY" --network "$PUBLIC_NETWORK" --processors "$SERVER_PROCESSOR" --processor-type shared --key-name "$SSH_KEY_NAME" --sys-type "$SERVER_SYS_TYPE" --json >> server.log | tee
+    ibmcloud pi instance-create "$SERVER_NAME" --image "$SERVER_IMAGE" --memory "$SERVER_MEMORY" --network "$PUBLIC_NETWORK" --processors "$SERVER_PROCESSOR" --processor-type shared --key-name "$SSH_KEY_NAME" --sys-type "$SERVER_SYS_TYPE" --json >> $SERVER_ROOT/server.log | tee
 
-    SERVER_ID=$(jq -r ".[].pvmInstanceID" < ./server.log)
-    SERVER_NAME=$(jq -r ".[].serverName" < ./server.log)
+    SERVER_ID=$(jq -r ".[].pvmInstanceID" < $SERVER_ROOT/server.log)
+    SERVER_NAME=$(jq -r ".[].serverName" < $SERVER_ROOT/server.log)
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME was created with the ID: $SERVER_ID"
     FINAL_SERVER_ID=$SERVER_ID
 
-    echo "SERVER_ID=$SERVER_ID" >> ./server-build.log
-    echo "SERVER_NAME=$SERVER_NAME" >> ./server-build.log
+    echo "SERVER_ID=$SERVER_ID" >> $SERVER_ROOT/server-build.log
+    echo "SERVER_NAME=$SERVER_NAME" >> $SERVER_ROOT/server-build.log
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  deploying the VMName:$SERVER_NAME, hold on please."
     STATUS=$(ibmcloud pi in "$SERVER_ID" --json | jq -r ".status")
@@ -100,7 +100,7 @@ function create_server () {
     echo
 
     if [[ "$STATUS" == "ERROR" ]]; then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): ERROR: VMName:$SERVER_NAME: a new VM could not be created, destroy the allocated resources..."
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): ERROR: VMName:$SERVER_NAME: a new VM could not be created, destroy the allocated resources..." | tee -a $SERVER_ROOT/server-build.log
         ibmcloud pi instance-delete "$SERVER_ID"
         return 1
     fi
@@ -119,8 +119,8 @@ function create_server () {
             sleep 3s
         done
 
-        echo "SERVER_EXTERNAL_IP=$EXTERNAL_IP" >> ./server-build.log
-        echo "SERVER_INTERNAL_IP=$INTERNAL_IP" >> ./server-build.log
+        echo "SERVER_EXTERNAL_IP=$EXTERNAL_IP" >> $SERVER_ROOT/server-build.log
+        echo "SERVER_INTERNAL_IP=$INTERNAL_IP" >> $SERVER_ROOT/server-build.log
     fi
     printf "%c" "    "
     while ! ping -c 1 "$EXTERNAL_IP" &> /dev/null
@@ -203,8 +203,14 @@ function run (){
         SERVER_NAME="vm-$SERVER_ID"
     fi
 
-    mkdir -p $PROGPATH/servers/"$SERVER_NAME"
-    cd $PROGPATH/servers/"$SERVER_NAME" || exit 1
+    SERVER_ROOT=$PROGPATH/servers/"$SERVER_NAME"
+    mkdir -p $SERVER_ROOT
+    #cd $PROGPATH/servers/"$SERVER_NAME" || exit 1
+    if [[ $? -ne 0 ]]
+    then
+        echo "ERROR: Could not create server root dir"
+        return 1
+    fi
 
     if [[ -z $SERVER_IMAGE || -z $PUBLIC_NETWORK || -z $SSH_KEY_NAME || -z $SERVER_MEMORY ||
         -z $SERVER_PROCESSOR || -z $SERVER_SYS_TYPE || -z $SSH_USER || -z $API_KEY || -z $PVS_CRN ]]
