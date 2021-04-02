@@ -15,6 +15,7 @@ function ctrl_c() {
 
 SERVER_NAME=""
 FINAL_SERVER_ID=""
+PROGPATH=$(dirname $0)
 
 function check_dependencies() {
 
@@ -55,7 +56,7 @@ function set_powervs() {
     
     if [ -z "$CRN" ]; then
         echo "CRN was not set."
-        exit
+        exit 1
     fi
     ibmcloud pi st "$CRN"
 }
@@ -141,11 +142,6 @@ function create_server () {
 function run (){
 
     echo "*****************************************************"
-    SERVER_ID=$(openssl rand -hex 5)
-    SERVER_NAME="kkdvm-$SERVER_ID"
-
-    mkdir -p ./servers/"$SERVER_NAME"
-    cd ./servers/"$SERVER_NAME" || exit 1
 
     ### Set this variables accordingly
     SERVER_IMAGE=
@@ -189,6 +185,9 @@ function run (){
         elif [[ $1 =~ ^--pvs_crn= ]]
         then
             PVS_CRN=$(cut -d= -f2- <<< $1)
+        elif [[ $1 =~ ^--server_name= ]]
+        then
+            SERVER_NAME=$(cut -d= -f2- <<< $1)
         else
             echo "ERROR: Invalid option $1"
             return 1
@@ -197,6 +196,16 @@ function run (){
         shift
     done
 
+    if [[ -z $SERVER_NAME ]]
+    then
+        # server name not given generate one
+        SERVER_ID=$(openssl rand -hex 5)
+        SERVER_NAME="vm-$SERVER_ID"
+    fi
+
+    mkdir -p $PROGPATH/servers/"$SERVER_NAME"
+    cd $PROGPATH/servers/"$SERVER_NAME" || exit 1
+
     if [[ -z $SERVER_IMAGE || -z $PUBLIC_NETWORK || -z $SSH_KEY_NAME || -z $SERVER_MEMORY ||
         -z $SERVER_PROCESSOR || -z $SERVER_SYS_TYPE || -z $SSH_USER || -z $API_KEY || -z $PVS_CRN ]]
     then
@@ -204,16 +213,24 @@ function run (){
         return 1
     fi
     
-    start=$(date +%s)
     check_dependencies
     check_connectivity
     authenticate "$API_KEY"
     set_powervs "$PVS_CRN"
+
+    # start of VM creation
+    start=$(date +%s)
     create_server "$SERVER_ID" "$SERVER_IMAGE" "$PUBLIC_NETWORK" "$SSH_KEY_NAME" \
-    "$SERVER_MEMORY" "$SERVER_PROCESSOR" "$SERVER_SYS_TYPE" "$SSH_USER"
+        "$SERVER_MEMORY" "$SERVER_PROCESSOR" "$SERVER_SYS_TYPE" "$SSH_USER"
+    rc=$?
     end=$(date +%s)
     echo "*****************************************************"
     runtime=$((end-start))
+    if [[ $rc -ne 0 ]]
+    then
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VM creation ended in ERROR, time taken: $runtime seconds"
+        return 1
+    fi
     echo "$(date +%Y-%m-%d" "%H:%M:%S): TOTAL TIME (upto ssh OK): $runtime seconds" 
 
     # now wait for health OK
