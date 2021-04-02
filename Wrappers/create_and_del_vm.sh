@@ -6,7 +6,7 @@
 
 progname=$(basename $0)
 progpath=$(dirname $0)
-keep_time_sec_def=600 #10 mins, default time to keep VM before deleting
+keep_time_sec_def=120 #2 mins, default time to keep VM before deleting
 server_name=
 server_name_pref_def=vm
 server_name_pref=$server_name_pref_def
@@ -113,16 +113,16 @@ function main
     fi
     eval "$cmd"
 
-    #wait for given time
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" | tee -a $logfile
-    sleep $keep_time_sec
-
     # get VM id from logfile
     vm_id=$(grep "was created with the ID:" $logfile | grep $server_name | awk '{print $NF}')
     if [[ -z $vm_id ]]
     then
         echo "$(date +%Y-%m-%d" "%H:%M:%S): VM ID for VM $server_name could not be found" | tee -a $logfile
     else
+        #wait for given time
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" | tee -a $logfile
+        sleep $keep_time_sec
+
         echo "$(date +%Y-%m-%d" "%H:%M:%S): Deleting VM $server_name (ID: $vm_id)" | tee -a $logfile
         ibmcloud pi instance-delete $vm_id
     fi
