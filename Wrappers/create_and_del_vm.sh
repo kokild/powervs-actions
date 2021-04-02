@@ -109,7 +109,7 @@ function main
         --ssh_user=$ssh_user --api_key=$api_key --pvs_crn=$pvs_crn"
     if [[ -n $logfile ]]
     then
-        cmd=$cmd" |& tee $logfile"
+        cmd=$cmd" |& tee -a $logfile"
     fi
     eval "$cmd"
 
