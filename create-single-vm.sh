@@ -36,11 +36,11 @@ function sec2hms
     HH=$((sec / (60 * 60) ))
     sec=$((sec - HH * 60 * 60))
     MM=$((sec / 60))
+    SS=$((sec - MM * 60))
     if [[ ${#MM} -lt 2 ]]
     then
         MM=0$MM
     fi
-    SS=$((sec - MM * 60))
     if [[ ${#SS} -lt 2 ]]
     then
         SS=0$SS
