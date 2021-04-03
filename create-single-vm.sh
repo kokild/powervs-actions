@@ -17,6 +17,37 @@ SERVER_NAME=""
 FINAL_SERVER_ID=""
 PROGPATH=$(dirname $0)
 
+# convert given seconds to HH:MM:SS
+function sec2hms
+{
+    local HH MM SS sec
+    if [[ $# -ne 1 ]]
+    then
+        echo "Usage: ${FUNCNAME[0]} <secs>"
+        return 1
+    fi
+    sec=$1
+    if [[ ! $sec =~ ^[0-9]+$ ]]
+    then
+        echo "Numerical value expected"
+        echo "Usage: $0 <secs>"
+        return 1
+    fi
+    HH=$((sec / (60 * 60) ))
+    sec=$((sec - HH * 60 * 60))
+    MM=$((sec / 60))
+    if [[ ${#MM} -lt 2 ]]
+    then
+        MM=0$MM
+    fi
+    SS=$((sec - MM * 60))
+    if [[ ${#SS} -lt 2 ]]
+    then
+        SS=0$SS
+    fi
+    echo $HH:$MM:$SS
+}
+
 function check_dependencies() {
 
     DEPENDENCIES=(ibmcloud jq)
@@ -81,7 +112,8 @@ function create_server () {
         --key-name "$SSH_KEY_NAME" --sys-type "$SERVER_SYS_TYPE" --json > $SERVER_ROOT/server.log 
     if head -1 $SERVER_ROOT/server.log | grep -q -w FAILED
     then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Server create FAILED"
+        sec_from_start=$((`date +%s` - START0))
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Server create FAILED, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
         return 1
     fi
 
@@ -113,8 +145,9 @@ function create_server () {
     fi
 
     if [[ "$STATUS" == "ACTIVE" ]]; then
+        sec_from_start=$((`date +%s` - START0))
         echo
-        echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is now ACTIVE."
+        echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is now ACTIVE, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
         echo "  waiting for the network availability, hold on please."
 
         EXTERNAL_IP=$(ibmcloud pi in "$SERVER_ID" --json | jq -r '.addresses[0].externalIP')
@@ -136,6 +169,9 @@ function create_server () {
         printf "%c" "."
     done
     echo
+    sec_from_start=$((`date +%s` - START0))
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME ping success at public IP $EXTERNAL_IP, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
+    echo "Now checking for SSH ..."
 
     while true
     do
@@ -149,11 +185,13 @@ EOF
         fi
         sleep 5
     done
+    sec_from_start=$((`date +%s` - START0))
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME SSH OK, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: RMC status:"
     #ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
     ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
-sudo rmcdomainstatus -s ctrmc | sed "s/^/\$(date)/"
+sudo rmcdomainstatus -s ctrmc | sed "s/^/\$(date)  /"
 EOF
     echo
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is ready, access it using ssh at $EXTERNAL_IP."
@@ -246,6 +284,7 @@ function run (){
 
     # start of VM creation
     start=$(date +%s)
+    START0=$start
     create_server "$SERVER_ID" "$SERVER_IMAGE" "$PUBLIC_NETWORK" "$SSH_KEY_NAME" \
         "$SERVER_MEMORY" "$SERVER_PROCESSOR" "$SERVER_SYS_TYPE" "$SSH_USER"
     rc=$?
@@ -254,32 +293,35 @@ function run (){
     runtime=$((end-start))
     if [[ $rc -ne 0 ]]
     then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): VM creation ended in ERROR, time taken: $runtime seconds"
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME VM creation ended in ERROR, time taken: $runtime seconds (`sec2hms $runtime`)"
         return 1
     fi
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): TOTAL TIME (upto ssh OK): $runtime seconds" 
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME TOTAL TIME (upto ssh OK): $runtime seconds (`sec2hms $runtime`)" 
 
     # now wait for health OK
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): waiting for Health to become OK"
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME waiting for Health to become OK"
     start=$(date +%s)
     loop_cnt=0
     while true
     do
-      sleep 15
-      h_stat=$(ibmcloud pi in $FINAL_SERVER_ID --json | jq -r .health.status)
-      if [[ $h_stat = OK ]]
-      then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): Health status OK now!"
-	break
-      fi
-      loop_cnt=$((loop_cnt + 1))
-      if [[ $((loop_cnt % 4)) -eq 0 ]]
-      then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): Current health status: $h_stat"
-      fi 
+        sleep 15
+        h_stat=$(ibmcloud pi in $FINAL_SERVER_ID --json | jq -r .health.status)
+        if [[ $h_stat = OK ]]
+        then
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Health status OK now!"
+	        break
+        fi
+        loop_cnt=$((loop_cnt + 1))
+        if [[ $((loop_cnt % 4)) -eq 0 ]]
+            then
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Current health status: $h_stat"
+        fi 
     done
     end=$(date +%s)
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): Time taken for health OK (after ssh OK): $((end-start)) sec"
+    ssh2healthOK=$((end - start))
+    sec_from_start=$((end - START0))
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Time taken for health OK (after ssh OK): $ssh2healthOK sec (`sec2hms $ssh2healthOK`)"
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME Total time from original start: $sec_from_start sec (`sec2hms $sec_from_start`)"
 }
 
 ### Main Execution ###
