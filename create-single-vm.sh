@@ -137,11 +137,14 @@ function create_server () {
     done
     echo
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  ++++ VMName:$SERVER_NAME: ping success"
-    until ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" 'uname -a; exit'; do
+    until ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" 'uname -a; exit'; do
         sleep 5
     done
     echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: RMC status:"
-    ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
+    #ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
+    ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
+sudo rmcdomainstatus -s ctrmc | sed "s/^/$(date)/"
+EOF
     echo
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is ready, access it using ssh at $EXTERNAL_IP."
 }
