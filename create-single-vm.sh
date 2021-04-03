@@ -190,9 +190,16 @@ EOF
 
     echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: RMC status:"
     #ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
-    ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
+    if [[ $SSH_USER != root ]]
+    then
+        ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
 sudo rmcdomainstatus -s ctrmc | sed "s/^/\$(date)  /"
 EOF
+    else
+        ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
+rmcdomainstatus -s ctrmc | sed "s/^/\$(date)  /"
+EOF
+    fi
     echo
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is ready, access it using ssh at $EXTERNAL_IP."
 }
