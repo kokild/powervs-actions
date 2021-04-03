@@ -103,6 +103,7 @@ function main
         logfile=$(mktemp)
         use_tmp_logfile=1
     fi
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): ===== Starting: UTCNOW: $(date -u)" | tee -a $logfile
 
     cmd="bash $progpath/../create-single-vm.sh --server_name=$server_name --server_image=$server_image --public_network=$public_network \
         --ssh_key_name=$ssh_key_name --server_memory=$server_memory --server_processor=$server_processor --server_sys_type=$server_sys_type \
