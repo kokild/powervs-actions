@@ -188,18 +188,35 @@ EOF
     sec_from_start=$((`date +%s` - START0))
     echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME SSH OK, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
 
-    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: RMC status:"
-    #ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
-    if [[ $SSH_USER != root ]]
-    then
-        ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
+    echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: waiting for RMC status to be connected"
+    tmpfile=$(mktemp)
+    while true
+    do
+        echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: present RMC status:"
+        #ssh -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" "sudo rmcdomainstatus -s ctrmc"
+        if [[ $SSH_USER != root ]]
+        then
+            ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF >$tmpfile
 sudo rmcdomainstatus -s ctrmc | sed "s/^/\$(date)  /"
 EOF
-    else
-        ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF
+        else
+            ssh -q -oStrictHostKeyChecking=no "$SSH_USER"@"$EXTERNAL_IP" << EOF >$tmpfile
 rmcdomainstatus -s ctrmc | sed "s/^/\$(date)  /"
 EOF
-    fi
+        fi
+        if grep -q "I A" $tmpfile
+        then
+            sec_from_start=$((`date +%s` - START0))
+            echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME: *** RMC CONNECTED, time from start: $sec_from_start sec (`sec2hms $sec_from_start`)"
+            cat $tmpfile
+            break
+        else
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): VMName:$SERVER_NAME: --- NOT CONNECTED"
+        fi
+        sleep 5
+    done
+    rm -f $tmpfile
+
     echo
     echo "$(date +%Y-%m-%d" "%H:%M:%S):  VMName:$SERVER_NAME is ready, access it using ssh at $EXTERNAL_IP."
 }
