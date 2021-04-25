@@ -22,13 +22,15 @@ pvs_crn=
 keep_time_sec=$keep_time_sec_def
 logfile=
 use_tmp_logfile=0
+no_del=0
 
 
 function usage
 {
     echo "Usage: $progname [--server_name_pref=<name>] --server_image=<image_id> --public_network=<pubnet_id> --ssh_key_name=<key_name>"
     echo "        --server_memory=<memory_GB> --server_processor=<cpu> --server_sys_type=<sys_type> --ssh_user=<user>"
-    echo "        --api_key=<key> --pvs_crn=<crn> [--keep_time_sec=<time before delete, default:$keep_time_sec_def>] [--logfile=<file>]"
+    echo "        --api_key=<key> --pvs_crn=<crn> [--keep_time_sec=<time before delete, default:$keep_time_sec_def>]"
+    echo "        [--logfile=<file>] [--no_del]"
 }
 
 function main
@@ -71,6 +73,9 @@ function main
         elif [[ $1 =~ ^--logfile= ]]
         then
             logfile=$(cut -d= -f2- <<< $1)
+        elif [[ $1 == --no_del ]]
+        then
+            no_del=1
         else
             echo "ERROR: Unknown oprion $1"
             usage
@@ -114,18 +119,22 @@ function main
     fi
     eval "$cmd"
 
-    # get VM id from logfile
-    vm_id=$(grep "was created with the ID:" $logfile | grep $server_name | awk '{print $NF}')
-    if [[ -z $vm_id ]]
+    # Now delete
+    if [[ $no_del -eq 0 ]]
     then
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): VM ID for VM $server_name could not be found" | tee -a $logfile
-    else
-        #wait for given time
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" | tee -a $logfile
-        sleep $keep_time_sec
+        # get VM id from logfile
+        vm_id=$(grep "was created with the ID:" $logfile | grep $server_name | awk '{print $NF}')
+        if [[ -z $vm_id ]]
+        then
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): VM ID for VM $server_name could not be found" | tee -a $logfile
+        else
+            #wait for given time
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): Sleeping for $keep_time_sec secs" | tee -a $logfile
+            sleep $keep_time_sec
 
-        echo "$(date +%Y-%m-%d" "%H:%M:%S): Deleting VM $server_name (ID: $vm_id)" | tee -a $logfile
-        ibmcloud pi instance-delete $vm_id
+            echo "$(date +%Y-%m-%d" "%H:%M:%S): Deleting VM $server_name (ID: $vm_id)" | tee -a $logfile
+            ibmcloud pi instance-delete $vm_id
+        fi
     fi
     echo "$(date +%Y-%m-%d" "%H:%M:%S): === TASK END ===" | tee -a $logfile
     if [[ $use_tmp_logfile -eq 1 ]]
